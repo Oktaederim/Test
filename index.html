@@ -3,113 +3,90 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Lüftungstechnischer Prozess-Rechner</title>
+    <title>Lüftungstechnischer Prozess-Simulator</title>
     <link rel="stylesheet" href="style.css">
-    
     <script>
-        window.MathJax = {
-          tex: {
-            inlineMath: [['$', '$'], ['\\(', '\\)']]
-          },
-          svg: {
-            fontCache: 'global'
-          }
-        };
+        window.MathJax = { tex: { inlineMath: [['$', '$']] } };
     </script>
     <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js" id="MathJax-script" async></script>
-
 </head>
 <body>
 
     <div class="container">
         <header>
-            <h1>Lüftungstechnischer Prozess-Rechner</h1>
-            <p>Vergleichen Sie den Ausgangs- mit dem Zielzustand und ermitteln Sie die erforderliche Prozessleistung.</p>
+            <h1>Lüftungstechnischer Prozess-Simulator ⚙️</h1>
+            <p>Definieren Sie einen Luftzustand und wenden Sie schrittweise Prozesse an.</p>
         </header>
 
         <div id="notification-area" class="notification hidden"></div>
 
-        <div class="input-master card">
-             <div class="input-group">
-                <label for="volume-flow">Volumenstrom (m³/h)</label>
-                <input type="number" id="volume-flow" value="1000">
+        <div class="card">
+            <h2>Aktueller Luftzustand</h2>
+            <div class="state-grid">
+                <div class="input-group">
+                    <label for="temperature">Temperatur (°C)</label>
+                    <input type="number" id="temperature" value="20">
+                </div>
+                <div class="input-group">
+                    <label for="humidity">Relative Feuchte (%)</label>
+                    <input type="number" id="humidity" value="50">
+                </div>
+                <div class="input-group">
+                    <label for="pressure">Luftdruck (hPa)</label>
+                    <input type="number" id="pressure" value="1013.25">
+                </div>
+                <div class="input-group">
+                    <label for="volume-flow">Volumenstrom (m³/h)</label>
+                    <input type="number"id="volume-flow" value="1000">
+                </div>
+            </div>
+            <div class="results-wrapper">
+                <div class="result-item"><span class="label">Absolute Feuchte (x)</span><span class="value" id="current-x"></span></div>
+                <div class="result-item"><span class="label">Enthalpie (h)</span><span class="value" id="current-h"></span></div>
+                <div class="result-item"><span class="label">Taupunkt (t_d)</span><span class="value" id="current-td"></span></div>
+                <div class="result-item"><span class="label">Dichte (ρ)</span><span class="value" id="current-rho"></span></div>
             </div>
         </div>
 
-        <main class="process-grid">
-            <div class="state-column card">
-                <h2>Ausgangszustand</h2>
+        <div class="card">
+            <h2>Prozessschritt anwenden</h2>
+            <div class="process-controls">
                 <div class="input-group">
-                    <label for="temp-initial">Temperatur (°C)</label>
-                    <input type="number" id="temp-initial" value="20">
+                    <label for="process-select">Prozess wählen</label>
+                    <select id="process-select">
+                        <option value="heat">Heizen</option>
+                        <option value="cool">Kühlen</option>
+                        <option value="steam_humidify">Dampfbefeuchtung</option>
+                    </select>
                 </div>
                 <div class="input-group">
-                    <label for="rh-initial">Relative Feuchte (%)</label>
-                    <input type="number" id="rh-initial" value="50">
+                    <label for="target-value" id="target-label">Ziel-Temperatur (°C)</label>
+                    <input type="number" id="target-value" value="22">
                 </div>
-                <div class="comfort-status" id="comfort-initial"></div>
-                <div class="results-wrapper">
-                    <div class="result-item"><span class="label">Absolute Feuchte (x)</span><span class="value" id="x-initial-g-kg"></span></div>
-                    <div class="result-item"><span class="label">Enthalpie (h)</span><span class="value" id="h-initial"></span></div>
-                    <div class="result-item"><span class="label">Taupunkttemperatur (t_d)</span><span class="value" id="td-initial"></span></div>
-                    <div class="result-item"><span class="label">Feuchtkugeltemperatur (t_w)</span><span class="value" id="tw-initial"></span></div>
-                </div>
+                <button id="apply-process-btn">Prozess Anwenden</button>
             </div>
+        </div>
 
-            <div class="state-column card">
-                <h2>Zielzustand</h2>
-                 <div class="input-group">
-                    <label for="temp-target">Temperatur (°C)</label>
-                    <input type="number" id="temp-target" value="24">
+        <div id="result-card" class="card hidden">
+            <h2>Ergebnis des Prozessschritts</h2>
+            <div class="results-wrapper">
+                <div class="result-item"><span class="label">Neue Temperatur</span><span class="value" id="result-t"></span></div>
+                <div class="result-item"><span class="label">Neue rel. Feuchte</span><span class="value" id="result-rh"></span></div>
+                <div class="result-item"><span class="label">Neue abs. Feuchte</span><span class="value" id="result-x"></span></div>
+                <div class="result-item"><span class="label">Neue Enthalpie</span><span class="value" id="result-h"></span></div>
+                <hr>
+                <div class="result-item large">
+                    <span class="label" id="power-label">Leistung</span>
+                    <span class="value" id="power-value"></span>
                 </div>
-                <div class="input-group">
-                    <label for="rh-target">Relative Feuchte (%)</label>
-                    <input type="number" id="rh-target" value="55">
-                </div>
-                <div class="comfort-status" id="comfort-target"></div>
-                 <div class="results-wrapper">
-                    <div class="result-item"><span class="label">Absolute Feuchte (x)</span><span class="value" id="x-target-g-kg"></span></div>
-                    <div class="result-item"><span class="label">Enthalpie (h)</span><span class="value" id="h-target"></span></div>
-                    <div class="result-item"><span class="label">Taupunkttemperatur (t_d)</span><span class="value" id="td-target"></span></div>
-                    <div class="result-item"><span class="label">Feuchtkugeltemperatur (t_w)</span><span class="value" id="tw-target"></span></div>
+                 <div class="result-item">
+                    <span class="label">Wasserbilanz</span>
+                    <span class="value" id="water-diff"></span>
                 </div>
             </div>
-        </main>
+            <button id="use-as-start-btn">Als neuen Ausgangszustand übernehmen</button>
+        </div>
         
-        <div class="process-results card">
-            <h2>Prozessanalyse</h2>
-            <div class="result-item large">
-                <span class="label">Heizleistung</span>
-                <span class="value heat-value" id="power-heat">0.00 kW</span>
-            </div>
-            <div class="result-item large">
-                <span class="label">Kühlleistung</span>
-                <span class="value cool-value" id="power-cool">0.00 kW</span>
-            </div>
-            <div class="result-item">
-                <span class="label">Wasserbilanz</span>
-                <span class="value" id="water-diff"></span>
-            </div>
-        </div>
-
-        <details class="info-box">
-            <summary>ℹ️ Info & Verwendete Formeln</summary>
-            <div class="info-content">
-                <h4>Wozu dient dieser Rechner?</h4>
-                <p>Dieser Rechner ermittelt die thermodynamischen Zustände von feuchter Luft und berechnet die erforderliche Heiz- und Kühlleistung, um die Luft von einem Ausgangs- zu einem Zielzustand zu verändern. Er ist für die schnelle Auslegung und Analyse von lüftungstechnischen Prozessen konzipiert.</p>
-                
-                <h4>Verwendete Formeln (vereinfacht)</h4>
-                <ul>
-                    <li><strong>Absolute Feuchte (x) [g/kg]:</strong><br> $x = 622 \cdot \frac{p_D}{p_{Luft} - p_D}$ <br><small>wobei $p_D$ der Wasserdampfpartialdruck ist.</small></li>
-                    <li><strong>Enthalpie (h) [kJ/kg]:</strong><br> $h \approx 1,006 \cdot t + \frac{x}{1000} \cdot (2501 + 1,86 \cdot t)$</li>
-                    <li><strong>Leistung (P) [kW]:</strong><br> $P = \dot{m} \cdot (h_{Ziel} - h_{Ausgang})$<br><small>wobei $\dot{m}$ der Massenstrom in kg/s ist.</small></li>
-                </ul>
-
-                <h4>Wichtiger Hinweis zur Genauigkeit</h4>
-                <p>Für eine präzise Leistungsberechnung ermittelt dieser Rechner die **Luftdichte ($\rho$)** für jeden Zustand dynamisch und verwendet keinen pauschalen Normwert. Der Massenstrom ($\dot{m} = \frac{\dot{V} \cdot \rho}{3600}$) wird daher auf Basis der Dichte am Lufteintritt (Ausgangszustand) berechnet.</p>
-            </div>
-        </details>
-
     </div>
 
     <script src="script.js"></script>
