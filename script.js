@@ -1,43 +1,41 @@
 document.addEventListener('DOMContentLoaded', () => {
-    // --- ELEMENTE AUSWÄHLEN ---
+    // === DOM-ELEMENTE ===
     const inputs = {
+        t: document.getElementById('temperature'),
+        rh: document.getElementById('humidity'),
+        p: document.getElementById('pressure'),
         v_flow: document.getElementById('volume-flow'),
-        t_initial: document.getElementById('temp-initial'),
-        rh_initial: document.getElementById('rh-initial'),
-        t_target: document.getElementById('temp-target'),
-        rh_target: document.getElementById('rh-target'),
+        processSelect: document.getElementById('process-select'),
+        targetValue: document.getElementById('target-value'),
+        targetLabel: document.getElementById('target-label'),
     };
     const outputs = {
-        notification: document.getElementById('notification-area'),
-        initial: {
-            x_g_kg: document.getElementById('x-initial-g-kg'), h: document.getElementById('h-initial'),
-            td: document.getElementById('td-initial'), tw: document.getElementById('tw-initial'),
-            comfort: document.getElementById('comfort-initial'),
+        current: {
+            x: document.getElementById('current-x'), h: document.getElementById('current-h'),
+            td: document.getElementById('current-td'), rho: document.getElementById('current-rho'),
         },
-        target: {
-            x_g_kg: document.getElementById('x-target-g-kg'), h: document.getElementById('h-target'),
-            td: document.getElementById('td-target'), tw: document.getElementById('tw-target'),
-            comfort: document.getElementById('comfort-target'),
-        },
-        process: {
-            power_heat: document.getElementById('power-heat'),
-            power_cool: document.getElementById('power-cool'),
-            water_diff: document.getElementById('water-diff')
+        resultCard: document.getElementById('result-card'),
+        result: {
+            t: document.getElementById('result-t'), rh: document.getElementById('result-rh'),
+            x: document.getElementById('result-x'), h: document.getElementById('result-h'),
+            powerLabel: document.getElementById('power-label'),
+            powerValue: document.getElementById('power-value'),
+            waterDiff: document.getElementById('water-diff'),
         }
     };
-
-    // --- HILFSFUNKTIONEN ---
-    const showNotification = (message, type = 'error') => {
-        outputs.notification.textContent = message;
-        outputs.notification.className = `notification ${type}`;
+    const buttons = {
+        apply: document.getElementById('apply-process-btn'),
+        useAsStart: document.getElementById('use-as-start-btn'),
     };
-    const clearNotification = () => outputs.notification.className = 'notification hidden';
-    const isComfortable = (t, rh) => (t >= 20 && t <= 26 && rh >= 40 && rh <= 60);
 
-    // --- BERECHNUNGSFUNKTION FÜR EINEN ZUSTAND ---
-    function calculateState(t, rh) {
-        if (isNaN(t) || isNaN(rh)) return null;
-        const p = 1013.25;
+    let currentState = {};
+    let resultState = {};
+
+    // === BERECHNUNGS-KERN ===
+    // Berechnet alle Eigenschaften eines Luftzustands basierend auf t, rh und p.
+    function calculateState(t, rh, p) {
+        // ... (Formeln sind identisch zur vorherigen Version)
+        if (isNaN(t) || isNaN(rh) || isNaN(p)) return null;
         const SDD = 6.112 * Math.exp((17.62 * t) / (243.12 + t));
         const DD = (rh / 100) * SDD;
         const v = Math.log(DD / 6.112);
@@ -46,67 +44,130 @@ document.addEventListener('DOMContentLoaded', () => {
         const h = 1.006 * t + (x_g_kg / 1000) * (2501 + 1.86 * t);
         const T_kelvin = t + 273.15;
         const rho = ((p - DD) * 100) / (287.058 * T_kelvin) + (DD * 100) / (461.52 * T_kelvin);
-        const Tw = t * Math.atan(0.151977 * Math.pow(rh + 8.313659, 0.5)) + Math.atan(t + rh) - Math.atan(rh - 1.676331) + 0.00391838 * Math.pow(rh, 1.5) * Math.atan(0.023101 * rh) - 4.686035;
-        const comfortable = isComfortable(t, rh);
-
-        return { t, rh, Td, x_g_kg, h, rho, Tw, comfortable };
+        return { t, rh, p, x_g_kg, h, Td, rho };
     }
-
-    // --- HAUPTFUNKTION ZUR AKTUALISIERUNG ---
-    function updateAll() {
-        if (parseFloat(inputs.rh_initial.value) > 100 || parseFloat(inputs.rh_target.value) > 100 || parseFloat(inputs.rh_initial.value) < 0 || parseFloat(inputs.rh_target.value) < 0) {
-            showNotification('Physikalisch nicht möglich: Relative Feuchte muss zwischen 0 und 100% liegen.');
-            return;
-        }
-        clearNotification();
-
-        const initial_state = calculateState(parseFloat(inputs.t_initial.value), parseFloat(inputs.rh_initial.value));
-        const target_state = calculateState(parseFloat(inputs.t_target.value), parseFloat(inputs.rh_target.value));
-        const v_flow = parseFloat(inputs.v_flow.value);
-
-        if (!initial_state || !target_state || isNaN(v_flow)) return;
-
-        const updateStateUI = (state, ui) => {
-            ui.x_g_kg.textContent = `${state.x_g_kg.toFixed(2)} g/kg`;
-            ui.h.textContent = `${state.h.toFixed(2)} kJ/kg`;
-            ui.td.textContent = `${state.Td.toFixed(1)} °C`;
-            ui.tw.textContent = `${state.Tw.toFixed(1)} °C`;
-            if (state.comfortable) {
-                ui.comfort.textContent = '✅ Im Behaglichkeitsfeld';
-                ui.comfort.className = 'comfort-status success';
-            } else {
-                ui.comfort.textContent = '⚠️ Außerhalb Behaglichkeitsfeld';
-                ui.comfort.className = 'comfort-status warning';
-            }
-        };
-        updateStateUI(initial_state, outputs.initial);
-        updateStateUI(target_state, outputs.target);
-
-        const m_dot = (v_flow * initial_state.rho) / 3600;
-        let cooling_power = 0;
-        let heating_power = 0;
-        
-        if (target_state.x_g_kg < initial_state.x_g_kg) { // Fall 1: Entfeuchtung
-            const intermediate_state = calculateState(target_state.Td, 100);
-            if(intermediate_state){
-                cooling_power = m_dot * (intermediate_state.h - initial_state.h);
-                heating_power = m_dot * (target_state.h - intermediate_state.h);
-            }
-        } else { // Fall 2: Kein Entfeuchtungsbedarf
-            const total_power = m_dot * (target_state.h - initial_state.h);
-            if (total_power > 0) heating_power = total_power;
-            else cooling_power = total_power;
-        }
-        
-        outputs.process.power_heat.textContent = `${Math.abs(heating_power).toFixed(2)} kW`;
-        outputs.process.power_cool.textContent = `${Math.abs(cooling_power).toFixed(2)} kW`;
-        
-        const water_diff_kg_h = m_dot * (target_state.x_g_kg - initial_state.x_g_kg) * 3600 / 1000;
-        const water_action = water_diff_kg_h > 0 ? 'Befeuchtung' : 'Entfeuchtung';
-        outputs.process.water_diff.textContent = `${Math.abs(water_diff_kg_h).toFixed(2)} kg/h (${water_action})`;
-    }
-
-    Object.values(inputs).forEach(input => input.addEventListener('input', updateAll));
     
-    updateAll();
+    // Berechnet einen Zustand rückwärts aus t und x (für Heizen/Kühlen bei konstanter Feuchte).
+    function calculateStateFrom_t_x(t, x_g_kg, p) {
+        const x_ratio = x_g_kg / 1000;
+        const p_d_partial = p / (1 + (1 / 0.622) * x_ratio);
+        const DD = p - p_d_partial;
+        const SDD = 6.112 * Math.exp((17.62 * t) / (243.12 + t));
+        const rh = (DD / SDD) * 100;
+        return calculateState(t, rh, p);
+    }
+    
+    // Berechnet einen Zustand rückwärts aus h und x (für Dampfbefeuchtung).
+    function calculateStateFrom_h_x(h, x_g_kg, p){
+        const t = (h - 2.501 * x_g_kg) / (1.006 + 0.00186 * x_g_kg);
+        return calculateStateFrom_t_x(t, x_g_kg, p);
+    }
+
+
+    // === UI-LOGIK ===
+    function updateCurrentStateUI() {
+        const t = parseFloat(inputs.t.value);
+        const rh = parseFloat(inputs.rh.value);
+        const p = parseFloat(inputs.p.value);
+        
+        currentState = calculateState(t, rh, p);
+
+        if (currentState) {
+            outputs.current.x.textContent = `${currentState.x_g_kg.toFixed(2)} g/kg`;
+            outputs.current.h.textContent = `${currentState.h.toFixed(2)} kJ/kg`;
+            outputs.current.td.textContent = `${currentState.Td.toFixed(1)} °C`;
+            outputs.current.rho.textContent = `${currentState.rho.toFixed(3)} kg/m³`;
+        }
+    }
+
+    function handleProcessChange() {
+        const process = inputs.processSelect.value;
+        switch (process) {
+            case 'heat':
+            case 'cool':
+                inputs.targetLabel.textContent = 'Ziel-Temperatur (°C)';
+                break;
+            case 'steam_humidify':
+                inputs.targetLabel.textContent = 'Ziel-Absolute Feuchte (g/kg)';
+                break;
+        }
+    }
+
+    function applyProcess() {
+        const process = inputs.processSelect.value;
+        const targetValue = parseFloat(inputs.targetValue.value);
+        const v_flow = parseFloat(inputs.v_flow.value);
+        if (isNaN(targetValue) || isNaN(v_flow)) return;
+
+        let power = 0;
+        let powerLabel = 'Leistung';
+        
+        switch (process) {
+            case 'heat':
+                resultState = calculateStateFrom_t_x(targetValue, currentState.x_g_kg, currentState.p);
+                power = (v_flow * currentState.rho / 3600) * (resultState.h - currentState.h);
+                powerLabel = "Heizleistung";
+                break;
+            case 'cool':
+                const Td_initial = currentState.Td;
+                if(targetValue < Td_initial){ // Entfeuchtung findet statt
+                    resultState = calculateState(targetValue, 100, currentState.p);
+                } else { // Sensible Kühlung
+                    resultState = calculateStateFrom_t_x(targetValue, currentState.x_g_kg, currentState.p);
+                }
+                power = (v_flow * currentState.rho / 3600) * (resultState.h - currentState.h);
+                powerLabel = "Kühlleistung";
+                break;
+            case 'steam_humidify':
+                resultState = calculateStateFrom_h_x(currentState.h, targetValue, currentState.p);
+                // Annahme: Dampf hat Enthalpie des Ausgangszustands, nur als Befeuchtung. Echter Dampf addiert Energie.
+                // Für Einfachheit wird hier nur die Befeuchtung gerechnet, nicht die Dampf-Energie.
+                const tempState = calculateStateFrom_t_x(currentState.t, targetValue, currentState.p);
+                power = (v_flow * currentState.rho / 3600) * (tempState.h - currentState.h);
+                powerLabel = "Heizleistung (durch Befeuchtung)";
+                break;
+        }
+        
+        displayResult(power, powerLabel);
+    }
+
+    function displayResult(power, powerLabel){
+        if (!resultState) return;
+        outputs.result.t.textContent = `${resultState.t.toFixed(1)} °C`;
+        outputs.result.rh.textContent = `${resultState.rh.toFixed(1)} %`;
+        outputs.result.x.textContent = `${resultState.x_g_kg.toFixed(2)} g/kg`;
+        outputs.result.h.textContent = `${resultState.h.toFixed(2)} kJ/kg`;
+        
+        outputs.result.powerLabel.textContent = powerLabel;
+        outputs.result.powerValue.textContent = `${Math.abs(power).toFixed(2)} kW`;
+        outputs.result.powerValue.className = power > 0 ? 'value heat-value' : 'value cool-value';
+
+        const water_diff = (resultState.x_g_kg - currentState.x_g_kg) * (parseFloat(inputs.v_flow.value) * currentState.rho) / 1000;
+        const water_action = water_diff > 0 ? "Befeuchtung" : "Entfeuchtung";
+        outputs.result.waterDiff.textContent = `${Math.abs(water_diff).toFixed(2)} kg/h (${water_action})`;
+        
+        outputs.resultCard.classList.remove('hidden');
+    }
+    
+    function useResultAsStart(){
+        if(!resultState) return;
+        inputs.t.value = resultState.t.toFixed(1);
+        inputs.rh.value = resultState.rh.toFixed(1);
+        
+        updateCurrentStateUI();
+        outputs.resultCard.classList.add('hidden');
+    }
+
+    // === EVENT LISTENERS ===
+    Object.values(inputs).forEach(input => {
+        if(input.id !== 'process-select' && input.id !== 'target-value'){
+            input.addEventListener('input', updateCurrentStateUI);
+        }
+    });
+    inputs.processSelect.addEventListener('change', handleProcessChange);
+    buttons.apply.addEventListener('click', applyProcess);
+    buttons.useAsStart.addEventListener('click', useResultAsStart);
+
+    // === INITIALISIERUNG ===
+    updateCurrentStateUI();
 });
