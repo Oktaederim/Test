@@ -54,8 +54,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- HAUPTFUNKTION ZUR AKTUALISIERUNG ---
     function updateAll() {
-        if (parseFloat(inputs.rh_initial.value) > 100 || parseFloat(inputs.rh_target.value) > 100) {
-            showNotification('Physikalisch nicht möglich: Relative Feuchte darf 100% nicht überschreiten.');
+        if (parseFloat(inputs.rh_initial.value) > 100 || parseFloat(inputs.rh_target.value) > 100 || parseFloat(inputs.rh_initial.value) < 0 || parseFloat(inputs.rh_target.value) < 0) {
+            showNotification('Physikalisch nicht möglich: Relative Feuchte muss zwischen 0 und 100% liegen.');
             return;
         }
         clearNotification();
@@ -88,8 +88,10 @@ document.addEventListener('DOMContentLoaded', () => {
         
         if (target_state.x_g_kg < initial_state.x_g_kg) { // Fall 1: Entfeuchtung
             const intermediate_state = calculateState(target_state.Td, 100);
-            cooling_power = m_dot * (intermediate_state.h - initial_state.h);
-            heating_power = m_dot * (target_state.h - intermediate_state.h);
+            if(intermediate_state){
+                cooling_power = m_dot * (intermediate_state.h - initial_state.h);
+                heating_power = m_dot * (target_state.h - intermediate_state.h);
+            }
         } else { // Fall 2: Kein Entfeuchtungsbedarf
             const total_power = m_dot * (target_state.h - initial_state.h);
             if (total_power > 0) heating_power = total_power;
