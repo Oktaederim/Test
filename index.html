@@ -3,92 +3,216 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Lüftungstechnischer Prozess-Simulator</title>
-    <link rel="stylesheet" href="style.css">
-    <script>
-        window.MathJax = { tex: { inlineMath: [['$', '$']] } };
-    </script>
-    <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js" id="MathJax-script" async></script>
+    <title>Feuchtigkeitsrechner</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        /* Stile für den Druck */
+        @media print {
+            body {
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+            }
+            .no-print {
+                display: none !important;
+            }
+            #results-container {
+                display: block !important;
+                box-shadow: none !important;
+                border: 1px solid #ccc;
+            }
+            main {
+                padding: 0;
+            }
+        }
+    </style>
 </head>
-<body>
+<body class="bg-gray-50 text-gray-800">
 
-    <div class="container">
-        <header>
-            <h1>Lüftungstechnischer Prozess-Simulator ⚙️</h1>
-            <p>Definieren Sie einen Luftzustand und wenden Sie schrittweise Prozesse an.</p>
-        </header>
+    <main class="container mx-auto p-4 sm:p-6 lg:p-8 max-w-4xl">
+        <div class="bg-white p-6 sm:p-8 rounded-xl shadow-lg no-print">
+            <h1 class="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">Feuchtigkeitsrechner</h1>
+            <p class="text-gray-600 mb-6">Geben Sie die Ausgangswerte ein, um die Änderung der relativen Luftfeuchtigkeit bei Temperaturschwankungen zu berechnen.</p>
 
-        <div id="notification-area" class="notification hidden"></div>
-
-        <div class="card">
-            <h2>Aktueller Luftzustand</h2>
-            <div class="state-grid">
-                <div class="input-group">
-                    <label for="temperature">Temperatur (°C)</label>
-                    <input type="number" id="temperature" value="20">
+            <!-- Eingabeformular -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-4">
+                <div>
+                    <label for="temp-initial" class="block text-sm font-medium text-gray-700 mb-1">Ausgangstemperatur (°C)</label>
+                    <input type="number" id="temp-initial" value="20" class="w-full p-3 bg-gray-100 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition">
                 </div>
-                <div class="input-group">
-                    <label for="humidity">Relative Feuchte (%)</label>
-                    <input type="number" id="humidity" value="50">
+                <div>
+                    <label for="rh-initial" class="block text-sm font-medium text-gray-700 mb-1">Relative Luftfeuchte (%)</label>
+                    <input type="number" id="rh-initial" value="50" class="w-full p-3 bg-gray-100 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition">
                 </div>
-                <div class="input-group">
-                    <label for="pressure">Luftdruck (hPa)</label>
-                    <input type="number" id="pressure" value="1013.25">
-                </div>
-                <div class="input-group">
-                    <label for="volume-flow">Volumenstrom (m³/h)</label>
-                    <input type="number"id="volume-flow" value="1000">
+                <div>
+                    <label for="temp-range" class="block text-sm font-medium text-gray-700 mb-1">Temperaturbereich (+/- °C)</label>
+                    <input type="number" id="temp-range" value="5" class="w-full p-3 bg-gray-100 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition">
                 </div>
             </div>
-            <div class="results-wrapper">
-                <div class="result-item"><span class="label">Absolute Feuchte (x)</span><span class="value" id="current-x"></span></div>
-                <div class="result-item"><span class="label">Enthalpie (h)</span><span class="value" id="current-h"></span></div>
-                <div class="result-item"><span class="label">Taupunkt (t_d)</span><span class="value" id="current-td"></span></div>
-                <div class="result-item"><span class="label">Dichte (ρ)</span><span class="value" id="current-rho"></span></div>
+            
+            <!-- Fehlermeldung -->
+            <div id="error-message" class="hidden bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg relative mb-4" role="alert">
+                <strong class="font-bold">Fehler:</strong>
+                <span class="block sm:inline" id="error-text"></span>
             </div>
-        </div>
 
-        <div class="card">
-            <h2>Prozessschritt anwenden</h2>
-            <div class="process-controls">
-                <div class="input-group">
-                    <label for="process-select">Prozess wählen</label>
-                    <select id="process-select">
-                        <option value="heat">Heizen</option>
-                        <option value="cool">Kühlen</option>
-                        <option value="steam_humidify">Dampfbefeuchtung</option>
-                    </select>
-                </div>
-                <div class="input-group">
-                    <label for="target-value" id="target-label">Ziel-Temperatur (°C)</label>
-                    <input type="number" id="target-value" value="22">
-                </div>
-                <button id="apply-process-btn">Prozess Anwenden</button>
+            <!-- Buttons -->
+            <div class="flex flex-col sm:flex-row gap-4 mt-6">
+                <button id="calculate-btn" class="w-full sm:w-auto bg-blue-600 text-white font-bold py-3 px-6 rounded-lg hover:bg-blue-700 transition-colors duration-300 shadow-md">
+                    Berechnen
+                </button>
+                <button id="print-btn" class="w-full sm:w-auto bg-gray-600 text-white font-bold py-3 px-6 rounded-lg hover:bg-gray-700 transition-colors duration-300 shadow-md hidden">
+                    Ergebnisse drucken
+                </button>
             </div>
         </div>
 
-        <div id="result-card" class="card hidden">
-            <h2>Ergebnis des Prozessschritts</h2>
-            <div class="results-wrapper">
-                <div class="result-item"><span class="label">Neue Temperatur</span><span class="value" id="result-t"></span></div>
-                <div class="result-item"><span class="label">Neue rel. Feuchte</span><span class="value" id="result-rh"></span></div>
-                <div class="result-item"><span class="label">Neue abs. Feuchte</span><span class="value" id="result-x"></span></div>
-                <div class="result-item"><span class="label">Neue Enthalpie</span><span class="value" id="result-h"></span></div>
-                <hr>
-                <div class="result-item large">
-                    <span class="label" id="power-label">Leistung</span>
-                    <span class="value" id="power-value"></span>
-                </div>
-                 <div class="result-item">
-                    <span class="label">Wasserbilanz</span>
-                    <span class="value" id="water-diff"></span>
-                </div>
+        <!-- Ergebnis-Container -->
+        <div id="results-container" class="hidden mt-8 bg-white p-6 sm:p-8 rounded-xl shadow-lg">
+             <h2 class="text-xl sm:text-2xl font-bold text-gray-900 mb-4">Ergebnisse</h2>
+             <p class="mb-6 text-gray-600">
+                Die absolute Feuchtigkeit bleibt konstant, während sich die relative Feuchtigkeit mit der Temperatur ändert. Ein Wert von über 100% rF bedeutet, dass Kondenswasser (Taupunkt) entsteht.
+             </p>
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Temperatur (°C)</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Relative Feuchte (%)</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Absolute Feuchte (g/m³)</th>
+                        </tr>
+                    </thead>
+                    <tbody id="results-body" class="bg-white divide-y divide-gray-200">
+                        <!-- Ergebniszeilen werden hier eingefügt -->
+                    </tbody>
+                </table>
             </div>
-            <button id="use-as-start-btn">Als neuen Ausgangszustand übernehmen</button>
         </div>
-        
-    </div>
+    </main>
 
-    <script src="script.js"></script>
+    <script>
+        // DOM-Elemente abrufen
+        const initialTempInput = document.getElementById('temp-initial');
+        const initialRhInput = document.getElementById('rh-initial');
+        const tempRangeInput = document.getElementById('temp-range');
+        const calculateBtn = document.getElementById('calculate-btn');
+        const printBtn = document.getElementById('print-btn');
+        const resultsContainer = document.getElementById('results-container');
+        const resultsBody = document.getElementById('results-body');
+        const errorMessage = document.getElementById('error-message');
+        const errorText = document.getElementById('error-text');
+
+        /**
+         * Berechnet den Sättigungsdampfdruck mit der Magnus-Formel.
+         * @param {number} temp - Temperatur in Grad Celsius.
+         * @returns {number} Sättigungsdampfdruck in hPa.
+         */
+        function getSaturationVaporPressure(temp) {
+            return 6.112 * Math.exp((17.67 * temp) / (temp + 243.5));
+        }
+
+        /**
+         * Berechnet die absolute Feuchtigkeit.
+         * @param {number} temp - Temperatur in Grad Celsius.
+         * @param {number} vaporPressure - Aktueller Dampfdruck in hPa.
+         * @returns {number} Absolute Feuchtigkeit in g/m³.
+         */
+        function getAbsoluteHumidity(temp, vaporPressure) {
+            // Umrechnung von hPa zu Pa (1 hPa = 100 Pa)
+            const vaporPressurePa = vaporPressure * 100;
+            // Temperatur in Kelvin
+            const tempKelvin = temp + 273.15;
+            // Spezifische Gaskonstante für Wasserdampf (Rv) in J/(kg·K)
+            const R_v = 461.52;
+            // Dichte in kg/m³, dann Umrechnung in g/m³ (* 1000)
+            return (vaporPressurePa / (R_v * tempKelvin)) * 1000;
+        }
+
+        // Event-Listener für den Berechnen-Button
+        calculateBtn.addEventListener('click', () => {
+            // Eingabewerte abrufen und in Zahlen umwandeln
+            const initialTemp = parseFloat(initialTempInput.value);
+            const initialRh = parseFloat(initialRhInput.value);
+            const tempRange = parseFloat(tempRangeInput.value);
+            
+            // --- Eingabevalidierung ---
+            errorMessage.classList.add('hidden');
+            if (isNaN(initialTemp) || isNaN(initialRh) || isNaN(tempRange)) {
+                errorText.textContent = 'Bitte geben Sie in alle Felder gültige Zahlen ein.';
+                errorMessage.classList.remove('hidden');
+                return;
+            }
+            if (initialRh < 0 || initialRh > 100) {
+                errorText.textContent = 'Die relative Luftfeuchtigkeit muss zwischen 0 und 100 % liegen.';
+                errorMessage.classList.remove('hidden');
+                return;
+            }
+             if (initialTemp < -50 || initialTemp > 100) {
+                errorText.textContent = 'Die Temperatur muss in einem realistischen Bereich liegen (-50°C bis 100°C).';
+                errorMessage.classList.remove('hidden');
+                return;
+            }
+            if (tempRange < 0) {
+                errorText.textContent = 'Der Temperaturbereich darf nicht negativ sein.';
+                errorMessage.classList.remove('hidden');
+                return;
+            }
+
+            // --- Berechnungen ---
+            // 1. Sättigungsdampfdruck bei Ausgangstemperatur berechnen
+            const initialSaturationVaporPressure = getSaturationVaporPressure(initialTemp);
+            
+            // 2. Aktuellen (realen) Dampfdruck berechnen. Dieser Wert bleibt konstant.
+            const actualVaporPressure = initialSaturationVaporPressure * (initialRh / 100);
+            
+            // 3. Absolute Feuchtigkeit berechnen. Dieser Wert bleibt ebenfalls konstant.
+            const absoluteHumidity = getAbsoluteHumidity(initialTemp, actualVaporPressure);
+
+            // Vorherige Ergebnisse löschen
+            resultsBody.innerHTML = '';
+            
+            // 4. Durch den Temperaturbereich iterieren und Ergebnisse berechnen
+            const startTemp = initialTemp - tempRange;
+            const endTemp = initialTemp + tempRange;
+
+            for (let temp = startTemp; temp <= endTemp; temp++) {
+                // Sättigungsdampfdruck für die neue Temperatur berechnen
+                const newSaturationVaporPressure = getSaturationVaporPressure(temp);
+                
+                // Neue relative Feuchtigkeit berechnen
+                let newRh = (actualVaporPressure / newSaturationVaporPressure) * 100;
+                
+                // CSS-Klasse für Hervorhebung bei Kondensation
+                let rhClass = '';
+                if (newRh > 100) {
+                    newRh = 100; // rF kann nicht über 100% steigen
+                    rhClass = 'font-bold text-blue-600';
+                }
+
+                // Neue Zeile für die Tabelle erstellen
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-800">${temp.toFixed(1)}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-800 ${rhClass}">${newRh.toFixed(1)}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-800">${absoluteHumidity.toFixed(2)}</td>
+                `;
+                resultsBody.appendChild(row);
+            }
+            
+            // Ergebnisse anzeigen und Drucken-Button einblenden
+            resultsContainer.classList.remove('hidden');
+            printBtn.classList.remove('hidden');
+        });
+
+        // Event-Listener für den Drucken-Button
+        printBtn.addEventListener('click', () => {
+            window.print();
+        });
+    </script>
 </body>
 </html>
